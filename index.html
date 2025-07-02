@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emoji Encryptor 🔐</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-6">
+
+    <div class="bg-white shadow-lg rounded-xl p-6 w-full max-w-2xl">
+        <h2 class="text-2xl font-bold text-center mb-6 text-purple-600">Emoji Encryptor 🔐</h2>
+
+        <div class="flex justify-center gap-4 mb-6">
+            <button onclick="setMode('encrypt')"
+                class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded">
+                Encrypt
+            </button>
+            <button onclick="setMode('decrypt')"
+                class="bg-green-500 hover:bg-green-600 text-white font-semibold px-4 py-2 rounded">
+                Decrypt
+            </button>
+        </div>
+
+        <!-- Encrypt UI -->
+        <div id="encryptDiv">
+            <h3 class="text-xl font-semibold text-gray-700 mb-2">Encrypt Message</h3>
+            <textarea id="plainText" placeholder="Enter message to encrypt"
+                class="w-full p-3 rounded border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none mb-3"></textarea>
+            <input type="password" id="encryptPassword" placeholder="Enter secret password"
+                class="w-full p-3 rounded border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none mb-3">
+            <button onclick="encrypt()"
+                class="bg-purple-500 hover:bg-purple-600 text-white font-semibold px-4 py-2 rounded mb-3">
+                Encrypt 🔒
+            </button>
+            <textarea id="emojiOutput" readonly placeholder="Encrypted emoji output"
+                class="w-full p-3 rounded border border-gray-300 bg-gray-100 focus:outline-none mb-3"></textarea>
+            <button onclick="copyToClipboard()"
+                class="bg-gray-700 hover:bg-gray-800 text-white font-semibold px-4 py-2 rounded">
+                Copy 🔗
+            </button>
+        </div>
+
+        <!-- Decrypt UI -->
+        <div id="decryptDiv" style="display:none">
+            <h3 class="text-xl font-semibold text-gray-700 mb-2">Decrypt Message</h3>
+            <textarea id="emojiInput" placeholder="Paste encrypted emojis"
+                class="w-full p-3 rounded border border-gray-300 focus:ring-2 focus:ring-green-400 focus:outline-none mb-3"></textarea>
+            <input type="password" id="decryptPassword" placeholder="Enter secret password"
+                class="w-full p-3 rounded border border-gray-300 focus:ring-2 focus:ring-green-400 focus:outline-none mb-3">
+            <button onclick="decrypt()"
+                class="bg-green-500 hover:bg-green-600 text-white font-semibold px-4 py-2 rounded mb-3">
+                Decrypt 🔓
+            </button>
+            <textarea id="decryptedOutput" readonly placeholder="Decrypted message"
+                class="w-full p-3 rounded border border-gray-300 bg-gray-100 focus:outline-none mb-3"></textarea>
+        </div>
+    </div>
+
+
+    <script>
+        // Generate 256 safe emojis from Unicode 0x1F300 to 0x1F9FF
+        const emojiList = [];
+        for (let i = 0x1F300; emojiList.length < 256 && i <= 0x1F9FF; i++) {
+            const emoji = String.fromCodePoint(i);
+            // Skip problematic emojis (flags, skin tones, etc.)
+            if (!/\uFE0F|\u200D/.test(emoji)) emojiList.push(emoji);
+        }
+
+        function setMode(mode) {
+            document.getElementById("encryptDiv").style.display = mode === "encrypt" ? "block" : "none";
+            document.getElementById("decryptDiv").style.display = mode === "decrypt" ? "block" : "none";
+        }
+
+        function stringToBytes(str) {
+            return Array.from(new TextEncoder().encode(str));
+        }
+
+        function bytesToString(bytes) {
+            return new TextDecoder().decode(new Uint8Array(bytes));
+        }
+
+        function hashPassword(password) {
+            const bytes = stringToBytes(password);
+            return bytes.reduce((acc, b) => acc ^ b, 0); // simple XOR hash
+        }
+
+        function xorWithKey(bytes, key) {
+            return bytes.map(b => b ^ key);
+        }
+
+        function encrypt() {
+            const message = document.getElementById("plainText").value;
+            const password = document.getElementById("encryptPassword").value;
+            if (!message || !password) return alert("Enter message and password!");
+
+            const messageBytes = stringToBytes(message);
+            const key = hashPassword(password);
+            const encryptedBytes = xorWithKey(messageBytes, key);
+            const emojiString = encryptedBytes.map(b => emojiList[b]).join('');
+            document.getElementById("emojiOutput").value = emojiString;
+        }
+
+        function decrypt() {
+            const emojiStr = document.getElementById("emojiInput").value;
+            const password = document.getElementById("decryptPassword").value;
+            if (!emojiStr || !password) return alert("Enter emojis and password!");
+
+            const emojiMap = Object.fromEntries(emojiList.map((e, i) => [e, i]));
+
+            // Properly split emojis
+            const emojiArray = Array.from(emojiStr.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|\S/g) || []);
+            const byteValues = emojiArray.map(e => {
+                if (!(e in emojiMap)) {
+                    alert("Invalid emoji found: " + e);
+                    throw new Error("Invalid emoji");
+                }
+                return emojiMap[e];
+            });
+
+            const key = hashPassword(password);
+            const decryptedBytes = xorWithKey(byteValues, key);
+            try {
+                document.getElementById("decryptedOutput").value = bytesToString(decryptedBytes);
+            } catch {
+                document.getElementById("decryptedOutput").value = "❌ Failed to decrypt.";
+            }
+        }
+
+        function copyToClipboard() {
+            const text = document.getElementById("emojiOutput").value;
+            navigator.clipboard.writeText(text).then(() => alert("Copied!"));
+        }
+    </script>
+
+</body>
+
+</html>
